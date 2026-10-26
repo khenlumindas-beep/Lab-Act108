@@ -1,0 +1,53 @@
+﻿SmartTrack - IT108 Activity 7 - application-level security test evidence (pre-existing tests)
+Generated : 2026-10-26 12:38:30
+Server    : http://127.0.0.1:5000/api (uvicorn, started for this run)
+Suites    : tests.test_phase9_security (26 tests), tests.test_superadmin_guards (8 tests)
+
+test_cannot_create_announcement (tests.test_phase9_security.TestFacultyRBAC.test_cannot_create_announcement) ... ok
+test_cannot_create_doc_type (tests.test_phase9_security.TestFacultyRBAC.test_cannot_create_doc_type) ... ok
+test_cannot_create_user (tests.test_phase9_security.TestFacultyRBAC.test_cannot_create_user) ... ok
+test_cannot_list_compliance_records (tests.test_phase9_security.TestFacultyRBAC.test_cannot_list_compliance_records) ... ok
+test_cannot_list_insights (tests.test_phase9_security.TestFacultyRBAC.test_cannot_list_insights) ... ok
+test_cannot_list_users (tests.test_phase9_security.TestFacultyRBAC.test_cannot_list_users) ... ok
+test_cannot_read_all_remarks (tests.test_phase9_security.TestFacultyRBAC.test_cannot_read_all_remarks) ... ok
+test_cannot_read_audit_logs (tests.test_phase9_security.TestFacultyRBAC.test_cannot_read_audit_logs) ... ok
+test_cannot_recompute_insights (tests.test_phase9_security.TestFacultyRBAC.test_cannot_recompute_insights) ... ok
+test_document_analysis_missing_id (tests.test_phase9_security.TestInputValidation.test_document_analysis_missing_id) ... ok
+test_document_analysis_unknown_doc (tests.test_phase9_security.TestInputValidation.test_document_analysis_unknown_doc) ... ok
+test_insights_bad_priority_filter (tests.test_phase9_security.TestInputValidation.test_insights_bad_priority_filter) ... ok
+test_login_sql_injection_safe (tests.test_phase9_security.TestInputValidation.test_login_sql_injection_safe) ... ok
+test_suggest_remark_missing_id (tests.test_phase9_security.TestInputValidation.test_suggest_remark_missing_id) ... ok
+test_travel_limit_unknown_user (tests.test_phase9_security.TestInputValidation.test_travel_limit_unknown_user) ... ok
+test_unknown_route_404 (tests.test_phase9_security.TestInputValidation.test_unknown_route_404) ... ok
+test_cannot_delete_others_travel (tests.test_phase9_security.TestOwnershipIsolation.test_cannot_delete_others_travel) ... skipped 'no other-owned travel available'
+test_cannot_read_others_travel (tests.test_phase9_security.TestOwnershipIsolation.test_cannot_read_others_travel) ... skipped 'no other-owned travel available'
+test_audit_requires_auth (tests.test_phase9_security.TestUnauthenticated.test_audit_requires_auth) ... ok
+test_bad_token_rejected (tests.test_phase9_security.TestUnauthenticated.test_bad_token_rejected) ... ok
+test_compliance_records_requires_auth (tests.test_phase9_security.TestUnauthenticated.test_compliance_records_requires_auth) ... ok
+test_documents_requires_auth (tests.test_phase9_security.TestUnauthenticated.test_documents_requires_auth) ... ok
+test_empty_bearer_rejected (tests.test_phase9_security.TestUnauthenticated.test_empty_bearer_rejected) ... ok
+test_insights_requires_auth (tests.test_phase9_security.TestUnauthenticated.test_insights_requires_auth) ... ok
+test_me_requires_auth (tests.test_phase9_security.TestUnauthenticated.test_me_requires_auth) ... ok
+test_travels_requires_auth (tests.test_phase9_security.TestUnauthenticated.test_travels_requires_auth) ... ok
+test_cannot_change_own_role (tests.test_superadmin_guards.TestSuperAdminGuards.test_cannot_change_own_role) ... ok
+test_cannot_deactivate_self (tests.test_superadmin_guards.TestSuperAdminGuards.test_cannot_deactivate_self) ... ok
+test_create_rejects_invalid_role (tests.test_superadmin_guards.TestSuperAdminGuards.test_create_rejects_invalid_role) ... ok
+test_create_super_admin_respects_cap (tests.test_superadmin_guards.TestSuperAdminGuards.test_create_super_admin_respects_cap) ... ok
+test_deactivated_user_is_logged_out (tests.test_superadmin_guards.TestSuperAdminGuards.test_deactivated_user_is_logged_out) ... ok
+test_reactivate_missing_user_404 (tests.test_superadmin_guards.TestSuperAdminGuards.test_reactivate_missing_user_404) ... ok
+test_role_change_blocks_account (tests.test_superadmin_guards.TestSuperAdminGuards.test_role_change_blocks_account) ... FAIL
+test_update_cannot_change_role_or_active (tests.test_superadmin_guards.TestSuperAdminGuards.test_update_cannot_change_role_or_active) ... ok
+System.Management.Automation.RemoteException
+======================================================================
+FAIL: test_role_change_blocks_account (tests.test_superadmin_guards.TestSuperAdminGuards.test_role_change_blocks_account)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\xampp\htdocs\SmartTrack\backend\tests\test_superadmin_guards.py", line 176, in test_role_change_blocks_account
+    self.assertEqual(re1.status_code, 400)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 200 != 400
+System.Management.Automation.RemoteException
+----------------------------------------------------------------------
+Ran 34 tests in 11.504s
+System.Management.Automation.RemoteException
+FAILED (failures=1, skipped=2)

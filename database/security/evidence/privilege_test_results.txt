@@ -1,0 +1,138 @@
+﻿SmartTrack - IT108 Activity 7 - sandbox privilege test evidence
+Generated        : 2026-10-26 12:27:17
+Server           : PostgreSQL 18.6 on x86_64-windows, compiled by msvc-19.44.35228, 64-bit
+Live database    : smarttrack_db (READ-ONLY in this run)
+Sandbox database : smarttrack_security_lab
+Scripts          : 01_roles_and_grants.sql, 02_rls_policy.sql,
+                   03_sandbox_seed.sql, 04_privilege_tests.sql
+Note             : ERROR lines under BLOCKED tests are EXPECTED.
+
+Pager usage is off.
+==================================================================
+SMARTTRACK DB SECURITY LAB - allowed/blocked action tests
+==================================================================
+--- T-01 super_admin SELECT travels | EXPECT: allowed, count = 3
+BEGIN
+SET
+    test     | visible_travels 
+-------------+-----------------
+ T-01 result |               3
+(1 row)
+
+ROLLBACK
+RESET
+--- T-02 super_admin DELETE disposable row 9103 | EXPECT: allowed (1 row)
+BEGIN
+SET
+DELETE 1
+    test     | remaining_disposable_rows 
+-------------+---------------------------
+ T-02 result |                         0
+(1 row)
+
+ROLLBACK
+RESET
+--- T-03 faculty DELETE travels | EXPECT: BLOCKED -> permission denied
+BEGIN
+SET
+psql:C:/xampp/htdocs/SmartTrack/database/security/04_privilege_tests.sql:45: ERROR:  permission denied for table travels
+ROLLBACK
+RESET
+--- T-04 faculty UPDATE users | EXPECT: BLOCKED -> permission denied
+BEGIN
+SET
+psql:C:/xampp/htdocs/SmartTrack/database/security/04_privilege_tests.sql:55: ERROR:  permission denied for table users
+ROLLBACK
+RESET
+--- T-05 faculty SELECT password_hash FROM users | EXPECT: BLOCKED
+BEGIN
+SET
+psql:C:/xampp/htdocs/SmartTrack/database/security/04_privilege_tests.sql:65: ERROR:  permission denied for table users
+ROLLBACK
+RESET
+--- T-06 faculty INSERT INTO audit_logs | EXPECT: BLOCKED
+BEGIN
+SET
+psql:C:/xampp/htdocs/SmartTrack/database/security/04_privilege_tests.sql:76: ERROR:  permission denied for table audit_logs
+ROLLBACK
+RESET
+--- T-07 faculty SELECT travels as user 9001 | EXPECT: allowed, count = 1 (own row only)
+BEGIN
+SET
+SET
+    test     | visible_travels 
+-------------+-----------------
+ T-07 result |               1
+(1 row)
+
+ROLLBACK
+RESET
+--- T-08 faculty SELECT travels without identity | EXPECT: allowed, count = 0 (fail-closed)
+BEGIN
+SET
+    test     | visible_travels 
+-------------+-----------------
+ T-08 result |               0
+(1 row)
+
+ROLLBACK
+RESET
+--- T-09 faculty INSERT own travel row | EXPECT: allowed
+BEGIN
+SET
+SET
+INSERT 0 1
+    test     | inserted_rows 
+-------------+---------------
+ T-09 result |             1
+(1 row)
+
+ROLLBACK
+RESET
+--- T-10 faculty INSERT row owned by user 9002 | EXPECT: BLOCKED -> row-level security violation
+BEGIN
+SET
+SET
+psql:C:/xampp/htdocs/SmartTrack/database/security/04_privilege_tests.sql:131: ERROR:  new row violates row-level security policy for table "travels"
+ROLLBACK
+RESET
+--- T-11 faculty UPDATE own travel row 9101 | EXPECT: allowed (1 row)
+BEGIN
+SET
+SET
+UPDATE 1
+    test     | updated_rows 
+-------------+--------------
+ T-11 result |            1
+(1 row)
+
+ROLLBACK
+RESET
+--- T-12 faculty UPDATE travel row 9102 (admin-owned) | EXPECT: blocked by RLS, 0 rows
+BEGIN
+SET
+SET
+UPDATE 0
+    test     | visible_target_rows 
+-------------+---------------------
+ T-12 result |                   0
+(1 row)
+
+ROLLBACK
+RESET
+--- EVIDENCE: table_privileges after GRANT/REVOKE
+        grantee         |  table_name   |           privileges           
+------------------------+---------------+--------------------------------
+ smarttrack_faculty     | documents     | INSERT, SELECT, UPDATE
+ smarttrack_faculty     | notifications | INSERT, SELECT, UPDATE
+ smarttrack_faculty     | travels       | INSERT, SELECT, UPDATE
+ smarttrack_super_admin | audit_logs    | INSERT, SELECT
+ smarttrack_super_admin | documents     | DELETE, INSERT, SELECT, UPDATE
+ smarttrack_super_admin | notifications | DELETE, INSERT, SELECT, UPDATE
+ smarttrack_super_admin | travels       | DELETE, INSERT, SELECT, UPDATE
+ smarttrack_super_admin | users         | INSERT, SELECT, UPDATE
+(8 rows)
+
+==================================================================
+END of tests
+==================================================================

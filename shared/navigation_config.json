@@ -1,0 +1,107 @@
+{
+  "header": {
+    "logo": "images/logo.png",
+    "logoSize": 56,
+    "institution": {
+      "name": "CARAGA STATE UNIVERSITY - CAGDABARAN CAMPUS",
+      "subtitle": "Office of Internationalization and Global Engagement (OIGE)"
+    },
+    "brand": {
+      "name": "SmartTrack",
+      "subtitle": "AI-Based International Travel Monitoring System"
+    },
+    "navigation": [
+      {
+        "label": "Home",
+        "icon": "home",
+        "href": "#",
+        "active": true
+      },
+      {
+        "label": "About",
+        "icon": "info",
+        "href": "#"
+      },
+      {
+        "label": "Help",
+        "icon": "help",
+        "href": "#"
+      },
+      {
+        "label": "EN",
+        "icon": "globe",
+        "href": "#"
+      }
+    ]
+  },
+  "footer": {
+    "text": "CSUCC OIGE • SmartTrack",
+    "copyright": "© 2026"
+  },
+  "login": {
+    "title": "Sign in to SmartTrack",
+    "subtitle": "Access your travel records, documents and dashboard",
+    "fields": [
+      {
+        "name": "email",
+        "label": "Email Address",
+        "placeholder": "Enter your email address",
+        "type": "email",
+        "icon": "mail"
+      },
+      {
+        "name": "password",
+        "label": "Password",
+        "placeholder": "Enter your password",
+        "type": "password",
+        "icon": "lock"
+      }
+    ],
+    "rememberMe": "Remember me",
+    "forgotPassword": "Forgot Password?",
+    "submitButton": "Sign In",
+    "authorizedUsersOnly": "Authorized CSUCC OIGE users only"
+  },
+  "benefits": {
+    "title": "International Travel Monitoring",
+    "subtitle": "Smarter monitoring. Safer journeys. Global opportunities.",
+    "items": [
+      {
+        "icon": "plane",
+        "title": "Travel Records",
+        "description": "Manage and track international travel records."
+      },
+      {
+        "icon": "document",
+        "title": "Document Monitoring",
+        "description": "Upload, verify and monitor required documents."
+      },
+      {
+        "icon": "brain",
+        "title": "AI-Assisted Compliance Analysis",
+        "description": "Detect risks and ensure compliance with institutional and global standards."
+      }
+    ]
+  },
+  "colors": {
+    "primary": "#1a5f3f",
+    "primaryLight": "#2a7a52",
+    "secondary": "#f5a623",
+    "accentColor": "#3b82f6",
+    "textPrimary": "#1e293b",
+    "textSecondary": "#64748b",
+    "borderColor": "#e2e8f0",
+    "panelBg": "#dde9f0"
+  },
+  "icons": {
+    "mail": "📧",
+    "lock": "🔒",
+    "plane": "✈️",
+    "document": "📄",
+    "brain": "🧠",
+    "home": "🏠",
+    "info": "ℹ️",
+    "help": "❓",
+    "globe": "🌐"
+  }
+}
