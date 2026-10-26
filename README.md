@@ -98,3 +98,11 @@ cd mobile_app; flutter test
 - AI is **heuristics + rules only** (no OCR/LLM). FR-F11 (AI assistant chat) is
   deferred by project decision.
 - PDF/Excel exports and compliance engine (BR-07) are in scope and implemented.
+
+## Course submissions
+
+- **Lab-Act108** — IT108 Activity 7: PostgreSQL Database Security and Access
+  Control. Deliverables: `docs/IT108_Activity_7_SmartTrack_COMPLETED.docx`
+  (lab report), `docs/IT108_ACTIVITY7_DATABASE_SECURITY.md` (repository
+  evidence), and `database/security/` (roles, GRANT/REVOKE, RLS policy,
+  sandbox test scripts + evidence).
