@@ -6,6 +6,7 @@ import '../api.dart';
 import '../brand.dart';
 import '../models.dart';
 import '../notify.dart';
+import '../realtime.dart';
 import '../widgets.dart';
 
 const _templateLabels = {
@@ -560,7 +561,7 @@ class RequirementsTab extends StatefulWidget {
   State<RequirementsTab> createState() => _RequirementsTabState();
 }
 
-class _RequirementsTabState extends State<RequirementsTab> {
+class _RequirementsTabState extends State<RequirementsTab> with RealtimeAware {
   List<Travel> _travels = [];
   int? _sel;
   ReqStatus? _status;
@@ -571,16 +572,24 @@ class _RequirementsTabState extends State<RequirementsTab> {
   String? _error;
 
   @override
+  Set<String> get realtimeTopics => const {'documents', 'travels'};
+
+  @override
+  Future<void> onRealtimeRefresh() => _loadTravels(silent: true);
+
+  @override
   void initState() {
     super.initState();
     _loadTravels();
   }
 
-  Future<void> _loadTravels() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _loadTravels({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final r = await ApiClient.instance.get('/travels/');
       _travels = (r as List)
@@ -933,7 +942,7 @@ class AdminChecklistsTab extends StatefulWidget {
   State<AdminChecklistsTab> createState() => _AdminChecklistsTabState();
 }
 
-class _AdminChecklistsTabState extends State<AdminChecklistsTab> {
+class _AdminChecklistsTabState extends State<AdminChecklistsTab> with RealtimeAware {
   List<ReqItem> _items = [];
   List<Travel> _travels = [];
   int? _postSel;
@@ -944,16 +953,24 @@ class _AdminChecklistsTabState extends State<AdminChecklistsTab> {
   String? _error;
 
   @override
+  Set<String> get realtimeTopics => const {'documents', 'travels'};
+
+  @override
+  Future<void> onRealtimeRefresh() => _load(silent: true);
+
+  @override
   void initState() {
     super.initState();
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final results = await Future.wait([
         ApiClient.instance.get('/requirements/'),
@@ -966,6 +983,15 @@ class _AdminChecklistsTabState extends State<AdminChecklistsTab> {
           .map((e) => Travel.fromJson(Map<String, dynamic>.from(e)))
           .toList()
         ..sort((a, b) => b.startDate.compareTo(a.startDate));
+      // Keep the open travel's live checklist in sync too.
+      if (silent && _postSel != null) {
+        try {
+          final r = await ApiClient.instance.get('/requirements/travel/$_postSel');
+          _postStatus = ReqStatus.fromJson(Map<String, dynamic>.from(r as Map));
+        } catch (_) {
+          // keep the previous checklist on transient errors
+        }
+      }
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -1134,15 +1160,34 @@ class _AdminChecklistsTabState extends State<AdminChecklistsTab> {
           },
         ),
       ),
-      child: OfficialPostTravelDoc(
-        items: post,
-        readOnly: true,
-        travelSelected: travelLive,
-        aiCheck: _postAi,
-        aiRunning: _postBusy,
-        onRunAiCheck: travelLive ? _runPostAi : null,
-        onDownloadPdf: () =>
-            _open('/requirements/templates/faculty_post_checklist'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_postSel != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Builder(builder: (_) {
+                final sel = _travels
+                    .where((t) => t.travelId == _postSel)
+                    .toList();
+                if (sel.isEmpty) return const SizedBox.shrink();
+                return SubmissionStatusChip(
+                    status: sel.first.submissionStatus,
+                    files: sel.first.submittedFiles,
+                    verified: sel.first.verifiedFiles);
+              }),
+            ),
+          OfficialPostTravelDoc(
+            items: post,
+            readOnly: true,
+            travelSelected: travelLive,
+            aiCheck: _postAi,
+            aiRunning: _postBusy,
+            onRunAiCheck: travelLive ? _runPostAi : null,
+            onDownloadPdf: () =>
+                _open('/requirements/templates/faculty_post_checklist'),
+          ),
+        ],
       ),
     );
   }

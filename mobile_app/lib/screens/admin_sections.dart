@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../api.dart';
 import '../models.dart';
 import '../notify.dart';
+import '../realtime.dart';
 import '../widgets.dart';
 
 /// ==================== STUDENT RECORDS ====================
@@ -209,7 +210,7 @@ class AdminReportsTab extends StatefulWidget {
   State<AdminReportsTab> createState() => _AdminReportsTabState();
 }
 
-class _AdminReportsTabState extends State<AdminReportsTab> {
+class _AdminReportsTabState extends State<AdminReportsTab> with RealtimeAware {
   List<Travel> _rows = [];
   Map<int, String> _userNames = {};
   Map<int, String> _collegeCodes = {};
@@ -218,16 +219,25 @@ class _AdminReportsTabState extends State<AdminReportsTab> {
   String? _error;
 
   @override
+  Set<String> get realtimeTopics =>
+      const {'travels', 'documents', 'compliance', 'requirements'};
+
+  @override
+  Future<void> onRealtimeRefresh() => _load(silent: true);
+
+  @override
   void initState() {
     super.initState();
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final now = DateTime.now().year;
       final results = await Future.wait([
@@ -298,8 +308,22 @@ class _AdminReportsTabState extends State<AdminReportsTab> {
             Text(
                 'MOVs: ${t.movs ?? '—'}   ·   Follow-up: ${t.followUp ?? '—'}',
                 style: const TextStyle(fontSize: 12)),
-            Text('Doc Completeness: ${t.docCompleteness ?? '—'}',
-                style: const TextStyle(fontSize: 12)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                SubmissionStatusChip(
+                    status: t.submissionStatus,
+                    files: t.submittedFiles,
+                    verified: t.verifiedFiles),
+                if (t.lastUploadAt != null)
+                  Text('Last upload: ${timeAgo(t.lastUploadAt)}',
+                      style: const TextStyle(
+                          fontSize: 11, color: Color(0xFF64748B))),
+              ],
+            ),
           ],
         ),
       ),
@@ -1064,7 +1088,8 @@ class AdminVerificationTab extends StatefulWidget {
   State<AdminVerificationTab> createState() => _AdminVerificationTabState();
 }
 
-class _AdminVerificationTabState extends State<AdminVerificationTab> {
+class _AdminVerificationTabState extends State<AdminVerificationTab>
+    with RealtimeAware {
   List<DocumentRec> _docs = [];
   List<Travel> _travels = [];
   Map<int, String> _userNames = {};
@@ -1082,16 +1107,24 @@ class _AdminVerificationTabState extends State<AdminVerificationTab> {
   static const _rejected = {'Rejected', 'Resubmission Required', 'Incomplete'};
 
   @override
+  Set<String> get realtimeTopics => const {'documents', 'travels'};
+
+  @override
+  Future<void> onRealtimeRefresh() => _load(silent: true);
+
+  @override
   void initState() {
     super.initState();
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final results = await Future.wait([
         ApiClient.instance.get('/documents/?limit=300'),
@@ -1136,6 +1169,13 @@ class _AdminVerificationTabState extends State<AdminVerificationTab> {
         ? (tr.participantName ?? 'Student')
         : (_userNames[tr.userId] ?? 'User #${tr.userId}');
     return '$owner — ${tr.eventTitle}';
+  }
+
+  Travel? _travelOf(int id) {
+    for (final t in _travels) {
+      if (t.travelId == id) return t;
+    }
+    return null;
   }
 
   Future<void> _viewScan(DocumentRec d) async {
@@ -1361,6 +1401,7 @@ class _AdminVerificationTabState extends State<AdminVerificationTab> {
           itemBuilder: (_, i) {
             final d = _visible[i];
             final awaiting = _awaiting.contains(d.status);
+            final owner = _travelOf(d.travelId);
             return Card(
               elevation: 0,
               shape: RoundedRectangleBorder(
@@ -1395,6 +1436,12 @@ class _AdminVerificationTabState extends State<AdminVerificationTab> {
                               label: Text(d.docCategory!,
                                   style: const TextStyle(fontSize: 11)),
                               visualDensity: VisualDensity.compact),
+                        if (owner != null)
+                          SubmissionStatusChip(
+                              status: owner.submissionStatus,
+                              files: owner.submittedFiles,
+                              verified: owner.verifiedFiles,
+                              compact: true),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -1504,7 +1551,8 @@ class AdminComplianceTab extends StatefulWidget {
   State<AdminComplianceTab> createState() => _AdminComplianceTabState();
 }
 
-class _AdminComplianceTabState extends State<AdminComplianceTab> {
+class _AdminComplianceTabState extends State<AdminComplianceTab>
+    with RealtimeAware {
   List<ComplianceRec> _records = [];
   Map<int, Travel> _travelById = {};
   Map<int, String> _userNames = {};
@@ -1515,16 +1563,25 @@ class _AdminComplianceTabState extends State<AdminComplianceTab> {
   String? _priorityFilter;
 
   @override
+  Set<String> get realtimeTopics =>
+      const {'compliance', 'travels', 'documents'};
+
+  @override
+  Future<void> onRealtimeRefresh() => _load(silent: true);
+
+  @override
   void initState() {
     super.initState();
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final params = StringBuffer('limit=100');
       if (_statusFilter != null) {
@@ -1726,6 +1783,17 @@ class _AdminComplianceTabState extends State<AdminComplianceTab> {
                                 _flag('Post', c.postTravelOk),
                                 _flag('Re-entry', c.reentryOk),
                               ]),
+                              if (_travelById[c.travelId] != null) ...[
+                                const SizedBox(height: 6),
+                                SubmissionStatusChip(
+                                    status: _travelById[c.travelId]!
+                                        .submissionStatus,
+                                    files: _travelById[c.travelId]!
+                                        .submittedFiles,
+                                    verified: _travelById[c.travelId]!
+                                        .verifiedFiles,
+                                    compact: true),
+                              ],
                               if (c.computedAt != null &&
                                   c.computedAt!.isNotEmpty)
                                 Padding(
@@ -1768,7 +1836,7 @@ class AdminLifecycleTab extends StatefulWidget {
   State<AdminLifecycleTab> createState() => _AdminLifecycleTabState();
 }
 
-class _AdminLifecycleTabState extends State<AdminLifecycleTab> {
+class _AdminLifecycleTabState extends State<AdminLifecycleTab> with RealtimeAware {
   List<Travel> _travels = [];
   Map<int, String> _userNames = {};
   Travel? _selected;
@@ -1779,16 +1847,25 @@ class _AdminLifecycleTabState extends State<AdminLifecycleTab> {
   String? _error;
 
   @override
+  Set<String> get realtimeTopics =>
+      const {'travels', 'documents', 'compliance'};
+
+  @override
+  Future<void> onRealtimeRefresh() => _loadTravels(silent: true);
+
+  @override
   void initState() {
     super.initState();
     _loadTravels();
   }
 
-  Future<void> _loadTravels() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _loadTravels({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final results = await Future.wait([
         ApiClient.instance.get('/travels/?limit=100'),
@@ -2204,6 +2281,7 @@ class _AdminLifecycleTabState extends State<AdminLifecycleTab> {
   }
 
   Widget _travelPicker() {
+    final sel = _selected;
     return SectionCard(
       title: 'Select travel',
       trailing: IconButton(
@@ -2211,24 +2289,36 @@ class _AdminLifecycleTabState extends State<AdminLifecycleTab> {
         icon: const Icon(Icons.calculate_outlined, size: 20),
         onPressed: _recompute,
       ),
-      child: DropdownButtonFormField<Travel>(
-        value: _selected,
-        isExpanded: true,
-        decoration: const InputDecoration(border: OutlineInputBorder()),
-        items: _travels
-            .map((t) => DropdownMenuItem<Travel>(
-                  value: t,
-                  child: Text(
-                    '${_ownerLabel(t)} — ${t.eventTitle}  ·  ${t.startDate}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                ))
-            .toList(),
-        onChanged: (t) {
-          if (t != null) _selectTravel(t);
-        },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          DropdownButtonFormField<Travel>(
+            value: _selected,
+            isExpanded: true,
+            decoration: const InputDecoration(border: OutlineInputBorder()),
+            items: _travels
+                .map((t) => DropdownMenuItem<Travel>(
+                      value: t,
+                      child: Text(
+                        '${_ownerLabel(t)} — ${t.eventTitle}  ·  ${t.startDate}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ))
+                .toList(),
+            onChanged: (t) {
+              if (t != null) _selectTravel(t);
+            },
+          ),
+          if (sel != null) ...[
+            const SizedBox(height: 8),
+            SubmissionStatusChip(
+                status: sel.submissionStatus,
+                files: sel.submittedFiles,
+                verified: sel.verifiedFiles),
+          ],
+        ],
       ),
     );
   }
@@ -2457,13 +2547,19 @@ class AdminAuditTab extends StatefulWidget {
   State<AdminAuditTab> createState() => _AdminAuditTabState();
 }
 
-class _AdminAuditTabState extends State<AdminAuditTab> {
+class _AdminAuditTabState extends State<AdminAuditTab> with RealtimeAware {
   List<AuditLogRow> _rows = [];
   Map<int, String> _userNames = {};
   bool _loading = true;
   String? _error;
   String? _entityFilter;
   String? _actionFilter;
+
+  @override
+  Set<String> get realtimeTopics => const <String>{};
+
+  @override
+  Future<void> onRealtimeRefresh() => _load(silent: true);
 
   static const _entityTypes = [
     null,
@@ -2495,11 +2591,13 @@ class _AdminAuditTabState extends State<AdminAuditTab> {
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final params = StringBuffer('limit=200');
       if (_entityFilter != null) {
@@ -2628,7 +2726,7 @@ class AdminRemarksTab extends StatefulWidget {
   State<AdminRemarksTab> createState() => _AdminRemarksTabState();
 }
 
-class _AdminRemarksTabState extends State<AdminRemarksTab> {
+class _AdminRemarksTabState extends State<AdminRemarksTab> with RealtimeAware {
   List<RemarkRow> _rows = [];
   Map<int, String> _adminNames = {};
   Map<int, Travel> _travelById = {};
@@ -2636,16 +2734,24 @@ class _AdminRemarksTabState extends State<AdminRemarksTab> {
   String? _error;
 
   @override
+  Set<String> get realtimeTopics => const {'remarks', 'travels', 'documents'};
+
+  @override
+  Future<void> onRealtimeRefresh() => _load(silent: true);
+
+  @override
   void initState() {
     super.initState();
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final results = await Future.wait([
         ApiClient.instance.get('/remarks?limit=200'),

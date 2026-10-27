@@ -13,6 +13,7 @@ from security import get_current_user, get_current_admin, get_current_user_heade
 from routes.notifications import create_travel_notification, create_admin_notification
 from audit import log_audit, record_remark
 from config import settings
+from realtime import hub
 import os
 import mimetypes
 import logging
@@ -124,6 +125,8 @@ async def upload_document(
         db.commit()
         db.refresh(document)
         
+        hub.publish("documents", "uploaded", document_id=document.document_id,
+                    travel_id=document.travel_id, status=document.status)
         logger.info(f"Document uploaded: {document.document_id} for travel {travel_id}")
         record_remark(
             db, travel_id=travel_id, admin_id=current_user.user_id,
@@ -349,6 +352,8 @@ async def verify_document(
         db.commit()
         db.refresh(document)
         
+        hub.publish("documents", "verified", document_id=document_id,
+                    travel_id=document.travel_id, status=document.status)
         logger.info(f"Document verified: {document_id}")
         try:
             from compliance import persist_compliance
@@ -423,6 +428,8 @@ async def update_document_status(
         db.commit()
         db.refresh(document)
         
+        hub.publish("documents", "status_changed", document_id=document_id,
+                    travel_id=document.travel_id, status=new_status)
         logger.info(f"Document status updated: {document_id} -> {new_status}")
         try:
             from compliance import persist_compliance
@@ -476,6 +483,8 @@ async def reject_document(
         db.commit()
         db.refresh(document)
 
+        hub.publish("documents", "rejected", document_id=document_id,
+                    travel_id=document.travel_id, status=document.status)
         logger.info(f"Document rejected: {document_id}")
         try:
             from compliance import persist_compliance
@@ -569,6 +578,8 @@ async def resubmit_document(
         db.commit()
         db.refresh(document)
 
+        hub.publish("documents", "resubmitted", document_id=document_id,
+                    travel_id=document.travel_id, status=document.status)
         if old_path and old_path != filepath:
             delete_uploaded_file(old_path)
 
@@ -631,9 +642,12 @@ async def delete_document(
             delete_uploaded_file(document.file_path)
         
         # Delete record
+        deleted_travel_id = document.travel_id
         db.delete(document)
         db.commit()
         
+        hub.publish("documents", "deleted", document_id=document_id,
+                    travel_id=deleted_travel_id)
         logger.info(f"Document deleted: {document_id}")
         
         return {"message": "Document deleted successfully"}

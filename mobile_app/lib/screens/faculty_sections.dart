@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../api.dart';
 import '../models.dart';
 import '../notify.dart';
+import '../realtime.dart';
 import '../widgets.dart';
 
 /// ==================== DOCUMENTS ====================
@@ -15,7 +16,7 @@ class FacultyDocumentsTab extends StatefulWidget {
   State<FacultyDocumentsTab> createState() => _FacultyDocumentsTabState();
 }
 
-class _FacultyDocumentsTabState extends State<FacultyDocumentsTab> {
+class _FacultyDocumentsTabState extends State<FacultyDocumentsTab> with RealtimeAware {
   List<DocumentRec> _docs = [];
   List<Travel> _travels = [];
   List<DocType> _types = [];
@@ -23,16 +24,24 @@ class _FacultyDocumentsTabState extends State<FacultyDocumentsTab> {
   String? _error;
 
   @override
+  Set<String> get realtimeTopics => const {'documents', 'travels'};
+
+  @override
+  Future<void> onRealtimeRefresh() => _load(silent: true);
+
+  @override
   void initState() {
     super.initState();
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final results = await Future.wait([
         ApiClient.instance.get('/documents/user/all'),
@@ -246,11 +255,75 @@ class _FacultyDocumentsTabState extends State<FacultyDocumentsTab> {
     }
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: body,
+      body: Column(
+        children: [
+          if (!_loading && _error == null && _travels.isNotEmpty)
+            _submissionBanner(),
+          Expanded(child: body),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _upload,
         icon: const Icon(Icons.upload_file),
         label: const Text('Upload Document'),
+      ),
+    );
+  }
+
+  /// Live per-travel submission summary — "Not Yet Submitted" until the
+  /// faculty member actually uploads a file.
+  Widget _submissionBanner() {
+    final pending = _travels.where((t) => !t.hasSubmitted).length;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFECFDF5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFA7F3D0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            const Icon(Icons.inbox_outlined,
+                size: 16, color: Color(0xFF059669)),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                pending == 0
+                    ? 'All travels have submitted documents'
+                    : '$pending travel(s) not yet submitted',
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF065F46)),
+              ),
+            ),
+            const LiveBadge(compact: true),
+          ]),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final t in _travels)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: Tooltip(
+                      message: t.eventTitle,
+                      child: SubmissionStatusChip(
+                          status: t.submissionStatus,
+                          files: t.submittedFiles,
+                          verified: t.verifiedFiles,
+                          compact: true),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

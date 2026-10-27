@@ -5,6 +5,7 @@ import '../api.dart';
 import '../brand.dart';
 import '../models.dart';
 import '../notify.dart';
+import '../realtime.dart';
 import '../widgets.dart';
 import 'faculty_sections.dart';
 import 'login_screen.dart';
@@ -19,6 +20,18 @@ class FacultyHome extends StatefulWidget {
 
 class _FacultyHomeState extends State<FacultyHome> {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    RealtimeService.instance.start();
+  }
+
+  @override
+  void dispose() {
+    RealtimeService.instance.stop();
+    super.dispose();
+  }
 
   static const _titles = [
     'Dashboard',
@@ -114,7 +127,7 @@ class _FacultyHomeState extends State<FacultyHome> {
       return Scaffold(
         appBar: BrandedHeader(
           title: title,
-          actions: [const NotificationBell(), _logoutBtn(context)],
+          actions: [const LiveBadge(), const NotificationBell(), _logoutBtn(context)],
         ),
         body: Row(
           children: [
@@ -136,7 +149,7 @@ class _FacultyHomeState extends State<FacultyHome> {
     return Scaffold(
       appBar: BrandedHeader(
         title: title,
-        actions: [const NotificationBell(), _logoutBtn(context)],
+        actions: [const LiveBadge(compact: true), const NotificationBell(), _logoutBtn(context)],
       ),
       body: AppBackground(child: IndexedStack(index: _index, children: pages)),
       bottomNavigationBar: NavigationBar(
@@ -175,6 +188,7 @@ class _FacultyHomeState extends State<FacultyHome> {
       );
 
   Future<void> _logout(BuildContext context) async {
+    RealtimeService.instance.stop();
     await Session.instance.clear();
     if (!context.mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
@@ -195,7 +209,7 @@ class _FacultyDashboard extends StatefulWidget {
   State<_FacultyDashboard> createState() => _FacultyDashboardState();
 }
 
-class _FacultyDashboardState extends State<_FacultyDashboard> {
+class _FacultyDashboardState extends State<_FacultyDashboard> with RealtimeAware {
   List<Travel> _travels = [];
   int _pendingDocs = 0;
   int _verifiedDocs = 0;
@@ -203,16 +217,24 @@ class _FacultyDashboardState extends State<_FacultyDashboard> {
   String? _error;
 
   @override
+  Set<String> get realtimeTopics => const {'documents', 'travels'};
+
+  @override
+  Future<void> onRealtimeRefresh() => _load(silent: true);
+
+  @override
   void initState() {
     super.initState();
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final userId = Session.instance.userId;
       final results = await Future.wait([
@@ -449,10 +471,16 @@ class _TravelRecords extends StatefulWidget {
   State<_TravelRecords> createState() => _TravelRecordsState();
 }
 
-class _TravelRecordsState extends State<_TravelRecords> {
+class _TravelRecordsState extends State<_TravelRecords> with RealtimeAware {
   List<Travel> _travels = [];
   bool _loading = true;
   String? _error;
+
+  @override
+  Set<String> get realtimeTopics => const {'travels', 'documents'};
+
+  @override
+  Future<void> onRealtimeRefresh() => _load(silent: true);
 
   @override
   void initState() {
@@ -460,11 +488,13 @@ class _TravelRecordsState extends State<_TravelRecords> {
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final userId = Session.instance.userId;
       final data = await ApiClient.instance.get('/travels/user/$userId');
@@ -647,6 +677,12 @@ class _TravelDetailTileState extends State<_TravelDetailTile> {
             Text('${travel.mobilityType}'
                 '${travel.country == null || travel.country!.isEmpty ? '' : ' · ${travel.country}'}',
                 style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+            const SizedBox(height: 6),
+            SubmissionStatusChip(
+                status: travel.submissionStatus,
+                files: travel.submittedFiles,
+                verified: travel.verifiedFiles,
+                compact: true),
             const SizedBox(height: 6),
             ...rows.map((s) => Padding(
                 padding: const EdgeInsets.only(bottom: 2),

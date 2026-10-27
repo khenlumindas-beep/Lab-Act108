@@ -19,9 +19,41 @@ from datetime import datetime, date
 from typing import List
 import logging
 
+from realtime import hub
+from submission import status_from_counts
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/travels", tags=["travels"])
+
+
+def _attach_submission(db: Session, travels) -> None:
+    """Attach live document counters + submission status to travel rows.
+
+    One grouped query for the whole page — no N+1. The UI shows
+    "Not Yet Submitted" whenever a travel has no uploaded files.
+    """
+    if not travels:
+        return
+    ids = [t.travel_id for t in travels]
+    rows = (
+        db.query(
+            Document.travel_id,
+            func.count(Document.document_id),
+            func.count(Document.document_id).filter(Document.status == "Verified"),
+            func.max(Document.uploaded_at),
+        )
+        .filter(Document.travel_id.in_(ids))
+        .group_by(Document.travel_id)
+        .all()
+    )
+    counts = {r[0]: (r[1], r[2], r[3]) for r in rows}
+    for travel in travels:
+        total, verified, last_upload = counts.get(travel.travel_id, (0, 0, None))
+        travel.submitted_files = total
+        travel.verified_files = verified
+        travel.last_upload_at = last_upload
+        travel.submission_status = status_from_counts(total, verified)
 
 # ==================== CREATE ====================
 
@@ -85,6 +117,8 @@ async def create_travel(
         db.add(travel)
         db.commit()
         db.refresh(travel)
+        hub.publish("travels", "created", travel_id=travel.travel_id,
+                    user_id=travel.user_id)
         
         logger.info(f"Travel record created: {travel.travel_id} by user {current_user.user_id}")
         
@@ -190,6 +224,8 @@ async def submit_travel_for_approval(
         db.commit()
         db.refresh(travel)
 
+        hub.publish("travels", "submitted", travel_id=travel_id,
+                    user_id=travel.user_id)
         logger.info(f"Travel {travel_id} submitted for approval by user {current_user.user_id}")
 
         record_remark(
@@ -247,6 +283,7 @@ async def get_travel(
                 detail="Not authorized to access this travel record"
             )
         
+        _attach_submission(db, [travel])
         return travel
     
     except HTTPException:
@@ -304,6 +341,7 @@ async def list_travels(
         
         travels = query.order_by(desc(Travel.created_at)).offset(skip).limit(limit).all()
         
+        _attach_submission(db, travels)
         return travels
     
     except Exception as e:
@@ -332,6 +370,7 @@ async def get_user_travels(
             Travel.user_id == user_id
         ).order_by(desc(Travel.created_at)).offset(skip).limit(limit).all()
         
+        _attach_submission(db, travels)
         return travels
     
     except HTTPException:
@@ -357,6 +396,7 @@ async def get_college_travels(
             Travel.college_id == college_id
         ).order_by(desc(Travel.created_at)).offset(skip).limit(limit).all()
         
+        _attach_submission(db, travels)
         return travels
     
     except Exception as e:
@@ -409,6 +449,8 @@ async def update_travel(
         db.commit()
         db.refresh(travel)
         
+        hub.publish("travels", "updated", travel_id=travel_id,
+                    user_id=travel.user_id)
         logger.info(f"Travel record updated: {travel_id}")
         
         return travel
@@ -459,6 +501,8 @@ async def update_travel_status(
         db.commit()
         db.refresh(travel)
         
+        hub.publish("travels", "status_changed", travel_id=travel_id,
+                    timeline_status=new_status)
         logger.info(f"Travel status updated: {travel_id} -> {new_status}")
         
         return {"message": "Status updated successfully", "travel": travel}
@@ -521,6 +565,8 @@ async def update_travel_workflow(
         db.commit()
         db.refresh(travel)
 
+        hub.publish("travels", "workflow_changed", travel_id=travel_id,
+                    workflow_status=target)
         logger.info(f"Travel workflow updated: {travel_id} {current} -> {target}")
 
         record_remark(
@@ -615,6 +661,7 @@ async def update_compliance_status(
         db.commit()
         db.refresh(travel)
         
+        hub.publish("compliance", "travel_updated", travel_id=travel_id)
         logger.info(f"Travel compliance updated: {travel_id}")
         
         return {"message": "Compliance updated successfully", "travel": travel}
@@ -657,6 +704,7 @@ async def delete_travel(
         db.delete(travel)
         db.commit()
         
+        hub.publish("travels", "deleted", travel_id=travel_id)
         logger.info(f"Travel record deleted: {travel_id}")
         
         return {"message": "Travel record deleted successfully"}

@@ -108,6 +108,10 @@ class Travel {
     this.remarks,
     this.workflowStatus,
     this.createdAt,
+    this.submissionStatus,
+    this.submittedFiles,
+    this.verifiedFiles,
+    this.lastUploadAt,
   });
   final int travelId;
   final int userId;
@@ -132,6 +136,14 @@ class Travel {
   final String? remarks;
   final String? workflowStatus;
   final String? createdAt;
+
+  /// Live submission state computed by the backend from the documents table.
+  final String? submissionStatus;
+  final int? submittedFiles;
+  final int? verifiedFiles;
+  final String? lastUploadAt;
+
+  bool get hasSubmitted => (submittedFiles ?? 0) > 0;
 
   String get displayName =>
       participantType == 'Student' ? (participantName ?? 'Student') : '';
@@ -160,6 +172,10 @@ class Travel {
         remarks: j['remarks'] as String?,
         workflowStatus: j['workflow_status'] as String?,
         createdAt: j['created_at']?.toString(),
+        submissionStatus: j['submission_status'] as String?,
+        submittedFiles: (j['submitted_files'] as num?)?.toInt(),
+        verifiedFiles: (j['verified_files'] as num?)?.toInt(),
+        lastUploadAt: j['last_upload_at']?.toString(),
       );
 }
 

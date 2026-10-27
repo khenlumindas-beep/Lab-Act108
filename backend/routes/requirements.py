@@ -33,6 +33,7 @@ from security import (
     get_current_user_header_or_query,
     TokenData,
 )
+from submission import status_from_counts
 import logging
 
 logger = logging.getLogger(__name__)
@@ -401,6 +402,7 @@ def _phase_report(db: Session, applies_to: str, phase: str,
 
     # Latest document per (travel, lowercased doc_type) in one query.
     latest: dict = {}
+    doc_stats: dict = {}
     tids = [t.travel_id for t in travels]
     if tids:
         docs = (
@@ -413,6 +415,13 @@ def _phase_report(db: Session, applies_to: str, phase: str,
             key = (d.travel_id, (d.doc_type or "").strip().lower())
             if key[1] and key not in latest:
                 latest[key] = d
+            total_docs, verified_docs, last_upload = doc_stats.get(
+                d.travel_id, (0, 0, None))
+            doc_stats[d.travel_id] = (
+                total_docs + 1,
+                verified_docs + (1 if (d.status or "") == "Verified" else 0),
+                last_upload or d.uploaded_at,
+            )
 
     rows = []
     for t in travels:
@@ -423,15 +432,22 @@ def _phase_report(db: Session, applies_to: str, phase: str,
             owner = user.full_name if user else f"User #{t.user_id}"
         college = user.college.name if user is not None and user.college else None
         verified = 0
+        submitted_required = 0
         missing = []
         for it in required_items:
             doc = latest.get((t.travel_id, it.name.strip().lower()))
-            if doc is not None and (doc.status or "") == "Verified":
-                verified += 1
+            if doc is not None:
+                submitted_required += 1
+                if (doc.status or "") == "Verified":
+                    verified += 1
+                else:
+                    missing.append(it.display_text or it.name)
             else:
                 missing.append(it.display_text or it.name)
         total = len(required_items)
         pct = round(verified * 100 / total, 1) if total else 100.0
+        total_docs, verified_docs, last_upload = doc_stats.get(
+            t.travel_id, (0, 0, None))
         rows.append({
             "travel_id": t.travel_id,
             "event_title": t.event_title,
@@ -444,6 +460,16 @@ def _phase_report(db: Session, applies_to: str, phase: str,
             "percent": pct,
             "complete": verified == total,
             "missing": missing,
+            # Live submission state (documents table, not the stale
+            # travels.doc_completeness column).
+            "submitted_files": total_docs,
+            "submitted_required": submitted_required,
+            "verified_files": verified_docs,
+            "last_upload_at": (
+                last_upload.isoformat() if last_upload else None),
+            "submission_status": status_from_counts(
+                total_docs, verified_docs, required_total=total,
+                required_verified=verified),
         })
 
     complete = len([r for r in rows if r["complete"]])

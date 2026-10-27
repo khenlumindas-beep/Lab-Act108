@@ -4,6 +4,7 @@ import '../account.dart';
 import '../api.dart';
 import '../models.dart';
 import '../notify.dart';
+import '../realtime.dart';
 import '../widgets.dart';
 import 'admin_sections.dart';
 import 'login_screen.dart';
@@ -18,6 +19,18 @@ class AdminHome extends StatefulWidget {
 
 class _AdminHomeState extends State<AdminHome> {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    RealtimeService.instance.start();
+  }
+
+  @override
+  void dispose() {
+    RealtimeService.instance.stop();
+    super.dispose();
+  }
 
   static const _titles = [
     'Admin Dashboard',
@@ -120,7 +133,7 @@ class _AdminHomeState extends State<AdminHome> {
       return Scaffold(
         appBar: BrandedHeader(
           title: title,
-          actions: [const NotificationBell(), _logoutBtn(context)],
+          actions: [const LiveBadge(), const NotificationBell(), _logoutBtn(context)],
         ),
         body: Row(
           children: [
@@ -142,7 +155,7 @@ class _AdminHomeState extends State<AdminHome> {
     return Scaffold(
       appBar: BrandedHeader(
         title: title,
-        actions: [const NotificationBell(), _logoutBtn(context)],
+        actions: [const LiveBadge(compact: true), const NotificationBell(), _logoutBtn(context)],
       ),
       body: AppBackground(child: IndexedStack(index: _index, children: pages)),
       bottomNavigationBar: NavigationBar(
@@ -181,6 +194,7 @@ class _AdminHomeState extends State<AdminHome> {
       );
 
   Future<void> _logout(BuildContext context) async {
+    RealtimeService.instance.stop();
     await Session.instance.clear();
     if (!context.mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
@@ -200,7 +214,7 @@ class _AdminDashboard extends StatefulWidget {
   State<_AdminDashboard> createState() => _AdminDashboardState();
 }
 
-class _AdminDashboardState extends State<_AdminDashboard> {
+class _AdminDashboardState extends State<_AdminDashboard> with RealtimeAware {
   Map<String, dynamic>? _summary;
   int _userCount = 0;
   int _collegeCount = 0;
@@ -210,16 +224,25 @@ class _AdminDashboardState extends State<_AdminDashboard> {
   String? _error;
 
   @override
+  Set<String> get realtimeTopics =>
+      const {'documents', 'travels', 'users', 'compliance'};
+
+  @override
+  Future<void> onRealtimeRefresh() => _load(silent: true);
+
+  @override
   void initState() {
     super.initState();
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final results = await Future.wait([
         ApiClient.instance.get('/analytics/system/summary'),
@@ -417,7 +440,16 @@ class _AdminDashboardState extends State<_AdminDashboard> {
         subtitle: Text(
             '${t.participantType} · ${t.mobilityType} · ${t.startDate}',
             style: const TextStyle(fontSize: 11.5)),
-        trailing: StatusChip(label: t.timelineStatus ?? 'Upcoming'),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            StatusChip(label: t.timelineStatus ?? 'Upcoming'),
+            const SizedBox(height: 3),
+            SubmissionStatusChip(
+                status: t.submissionStatus, files: t.submittedFiles, compact: true),
+          ],
+        ),
       );
 }
 
@@ -430,7 +462,7 @@ class _GlobalRegistry extends StatefulWidget {
   State<_GlobalRegistry> createState() => _GlobalRegistryState();
 }
 
-class _GlobalRegistryState extends State<_GlobalRegistry> {
+class _GlobalRegistryState extends State<_GlobalRegistry> with RealtimeAware {
   List<Travel> _travels = [];
   List<College> _colleges = [];
   bool _loading = true;
@@ -442,6 +474,12 @@ class _GlobalRegistryState extends State<_GlobalRegistry> {
   String? _participant;
 
   static const _years = ['2026', '2025', '2024'];
+
+  @override
+  Set<String> get realtimeTopics => const {'travels', 'documents'};
+
+  @override
+  Future<void> onRealtimeRefresh() => _load(silent: true);
 
   @override
   void initState() {
@@ -456,11 +494,13 @@ class _GlobalRegistryState extends State<_GlobalRegistry> {
         if (_participant != null) 'participant_type': _participant,
       };
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final query = _filters.entries
           .map((e) => '${e.key}=${Uri.encodeComponent(e.value.toString())}')
@@ -623,6 +663,12 @@ class _GlobalRegistryState extends State<_GlobalRegistry> {
                                           style:
                                               const TextStyle(fontSize: 12),
                                         ),
+                                        const SizedBox(height: 6),
+                                        SubmissionStatusChip(
+                                            status: t.submissionStatus,
+                                            files: t.submittedFiles,
+                                            verified: t.verifiedFiles,
+                                            compact: true),
                                       ],
                                     ),
                                     children: [
@@ -741,7 +787,7 @@ class _UsersTabState extends State<_UsersTab> {
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide:
-                      const BorderSide(color: Color(0xFFD4A323), width: 1.5),
+                      const BorderSide(color: Color(0xFF16A34A), width: 1.5),
                 ),
               );
 
@@ -891,13 +937,13 @@ class _UsersTabState extends State<_UsersTab> {
             margin: const EdgeInsets.only(top: 14),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-                color: const Color(0xFFFDF8E6),
+                color: const Color(0xFFECFDF5),
                 borderRadius: BorderRadius.circular(10)),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Icon(Icons.info_outline,
-                    size: 15, color: Color(0xFFA16207)),
+                    size: 15, color: Color(0xFF059669)),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -906,7 +952,7 @@ class _UsersTabState extends State<_UsersTab> {
                         : 'The new account can sign in with this password right away. Ask the user to change it later from Account settings.',
                     style: const TextStyle(
                         fontSize: 13.5,
-                        color: Color(0xFF854D0E),
+                        color: Color(0xFF065F46),
                         height: 1.45),
                   ),
                 ),
@@ -921,7 +967,7 @@ class _UsersTabState extends State<_UsersTab> {
                 const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: Color(0xFFD4A323), width: 1.5),
+              side: const BorderSide(color: Color(0xFF16A34A), width: 1.5),
             ),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 800),
@@ -931,7 +977,11 @@ class _UsersTabState extends State<_UsersTab> {
                     left: 0,
                     bottom: 0,
                     child: CustomPaint(
-                        size: Size(280, 120), painter: _CaCornerDecor()),
+                        size: Size(280, 120),
+                        painter: _CaCornerDecor(
+                            soft: Color(0x5934D399),
+                            mid: [Color(0xD934D399), Color(0xF2059669)],
+                            deep: [Color(0xFF059669), Color(0xFF047857)])),
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(32, 28, 32, 28),
@@ -952,12 +1002,12 @@ class _UsersTabState extends State<_UsersTab> {
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                       colors: [
-                                        Color(0xFFC48C1A),
-                                        Color(0xFFAA7209)
+                                        Color(0xFF34D399),
+                                        Color(0xFF059669)
                                       ]),
                                   boxShadow: [
                                     BoxShadow(
-                                        color: Color(0x40AA7209),
+                                        color: Color(0x4034D399),
                                         blurRadius: 12,
                                         offset: Offset(0, 4)),
                                   ],
@@ -1004,7 +1054,7 @@ class _UsersTabState extends State<_UsersTab> {
                           const Row(
                             children: [
                               Icon(Icons.article_outlined,
-                                  size: 17, color: Color(0xFFB8860B)),
+                                  size: 17, color: Color(0xFF059669)),
                               SizedBox(width: 8),
                               Text('Account Information',
                                   style: TextStyle(
@@ -1017,7 +1067,7 @@ class _UsersTabState extends State<_UsersTab> {
                                     height: 1.5,
                                     child: DecoratedBox(
                                         decoration: BoxDecoration(
-                                            color: Color(0xFFE8D08D)))),
+                                            color: Color(0xFFA7F3D0)))),
                               ),
                             ],
                           ),
@@ -1033,7 +1083,7 @@ class _UsersTabState extends State<_UsersTab> {
                                 style: OutlinedButton.styleFrom(
                                   backgroundColor: Colors.white,
                                   side: const BorderSide(
-                                      color: Color(0xFFB8860B), width: 1.5),
+                                      color: Color(0xFF059669), width: 1.5),
                                   foregroundColor: const Color(0xFF1E293B),
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 34, vertical: 12),
@@ -1045,9 +1095,14 @@ class _UsersTabState extends State<_UsersTab> {
                                 child: const Text('Cancel'),
                               ),
                               const SizedBox(width: 14),
-                              _GoldPillButton(
+                              _PillButton(
                                 icon: Icons.save_outlined,
                                 label: 'Create',
+                                gradient: const [
+                                  Color(0xFF22C55E),
+                                  Color(0xFF15803D)
+                                ],
+                                shadowColor: const Color(0x5915803D),
                                 onTap: () => Navigator.pop(ctx, true),
                               ),
                             ],
@@ -1113,7 +1168,7 @@ class _UsersTabState extends State<_UsersTab> {
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide:
-                      const BorderSide(color: Color(0xFFD4A323), width: 1.5),
+                      const BorderSide(color: Color(0xFF16A34A), width: 1.5),
                 ),
               );
 
@@ -1248,13 +1303,13 @@ class _UsersTabState extends State<_UsersTab> {
             margin: const EdgeInsets.only(top: 14),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-                color: const Color(0xFFFDF8E6),
+                color: const Color(0xFFECFDF5),
                 borderRadius: BorderRadius.circular(10)),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Icon(Icons.info_outline,
-                    size: 15, color: Color(0xFFA16207)),
+                    size: 15, color: Color(0xFF059669)),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -1263,7 +1318,7 @@ class _UsersTabState extends State<_UsersTab> {
                         : 'Account details are saved immediately. A role change will require the user to sign in again.',
                     style: const TextStyle(
                         fontSize: 13.5,
-                        color: Color(0xFF854D0E),
+                        color: Color(0xFF065F46),
                         height: 1.45),
                   ),
                 ),
@@ -1278,7 +1333,7 @@ class _UsersTabState extends State<_UsersTab> {
                 const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: Color(0xFFD4A323), width: 1.5),
+              side: const BorderSide(color: Color(0xFF16A34A), width: 1.5),
             ),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 800),
@@ -1288,7 +1343,11 @@ class _UsersTabState extends State<_UsersTab> {
                     left: 0,
                     bottom: 0,
                     child: CustomPaint(
-                        size: Size(280, 120), painter: _CaCornerDecor()),
+                        size: Size(280, 120),
+                        painter: _CaCornerDecor(
+                            soft: Color(0x5934D399),
+                            mid: [Color(0xD934D399), Color(0xF2059669)],
+                            deep: [Color(0xFF059669), Color(0xFF047857)])),
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(32, 28, 32, 28),
@@ -1309,12 +1368,12 @@ class _UsersTabState extends State<_UsersTab> {
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                       colors: [
-                                        Color(0xFFC48C1A),
-                                        Color(0xFFAA7209)
+                                        Color(0xFF34D399),
+                                        Color(0xFF059669)
                                       ]),
                                   boxShadow: [
                                     BoxShadow(
-                                        color: Color(0x40AA7209),
+                                        color: Color(0x4034D399),
                                         blurRadius: 12,
                                         offset: Offset(0, 4)),
                                   ],
@@ -1361,7 +1420,7 @@ class _UsersTabState extends State<_UsersTab> {
                           const Row(
                             children: [
                               Icon(Icons.article_outlined,
-                                  size: 17, color: Color(0xFFB8860B)),
+                                  size: 17, color: Color(0xFF059669)),
                               SizedBox(width: 8),
                               Text('Account Information',
                                   style: TextStyle(
@@ -1374,7 +1433,7 @@ class _UsersTabState extends State<_UsersTab> {
                                     height: 1.5,
                                     child: DecoratedBox(
                                         decoration: BoxDecoration(
-                                            color: Color(0xFFE8D08D)))),
+                                            color: Color(0xFFA7F3D0)))),
                               ),
                             ],
                           ),
@@ -1390,7 +1449,7 @@ class _UsersTabState extends State<_UsersTab> {
                                 style: OutlinedButton.styleFrom(
                                   backgroundColor: Colors.white,
                                   side: const BorderSide(
-                                      color: Color(0xFFB8860B), width: 1.5),
+                                      color: Color(0xFF059669), width: 1.5),
                                   foregroundColor: const Color(0xFF1E293B),
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 34, vertical: 12),
@@ -1402,9 +1461,14 @@ class _UsersTabState extends State<_UsersTab> {
                                 child: const Text('Cancel'),
                               ),
                               const SizedBox(width: 14),
-                              _GoldPillButton(
+                              _PillButton(
                                 icon: Icons.check_rounded,
                                 label: 'Save Changes',
+                                gradient: const [
+                                  Color(0xFF22C55E),
+                                  Color(0xFF15803D)
+                                ],
+                                shadowColor: const Color(0x5915803D),
                                 onTap: () => Navigator.pop(ctx, true),
                               ),
                             ],
@@ -1964,14 +2028,14 @@ class _AdminPlanTabState extends State<_AdminPlanTab> {
   }
 }
 
-class _GoldPillButton extends StatelessWidget {
+class _PillButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
   final List<Color>? gradient;
   final Color? shadowColor;
 
-  const _GoldPillButton(
+  const _PillButton(
       {required this.icon,
       required this.label,
       required this.onTap,
@@ -2156,7 +2220,7 @@ class _CaConfirmDialog extends StatelessWidget {
                     child: const Text('Cancel'),
                   ),
                   const SizedBox(width: 12),
-                  _GoldPillButton(
+                  _PillButton(
                     icon: confirmIcon,
                     label: confirmLabel,
                     gradient: confirmGradient,
@@ -2174,7 +2238,15 @@ class _CaConfirmDialog extends StatelessWidget {
 }
 
 class _CaCornerDecor extends CustomPainter {
-  const _CaCornerDecor();
+  final Color soft;
+  final List<Color> mid;
+  final List<Color> deep;
+
+  const _CaCornerDecor({
+    this.soft = const Color(0x59D49B28),
+    this.mid = const [Color(0xD9E0A92E), Color(0xF2B87D14)],
+    this.deep = const [Color(0xFFB87D14), Color(0xFF9A640A)],
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -2197,22 +2269,22 @@ class _CaCornerDecor extends CustomPainter {
       ..lineTo(0, 140 * sy)
       ..close();
 
-    canvas.drawPath(p1, Paint()..color = const Color(0x59D49B28));
+    canvas.drawPath(p1, Paint()..color = soft);
     canvas.drawPath(
         p2,
         Paint()
-          ..shader = const LinearGradient(
+          ..shader = LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xD9E0A92E), Color(0xF2B87D14)],
+            colors: mid,
           ).createShader(Rect.fromLTWH(0, 0, size.width, size.height)));
     canvas.drawPath(
         p3,
         Paint()
-          ..shader = const LinearGradient(
+          ..shader = LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFFB87D14), Color(0xFF9A640A)],
+            colors: deep,
           ).createShader(Rect.fromLTWH(0, 0, size.width, size.height)));
   }
 

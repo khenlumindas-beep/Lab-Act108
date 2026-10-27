@@ -14,6 +14,7 @@ from schemas import ComplianceRecordResponse, TravelLimitCheck
 from security import get_current_user, get_current_admin, TokenData
 from audit import log_audit
 from compliance import compute_compliance, persist_compliance, travel_limit_exceeded
+from realtime import hub
 import logging
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,7 @@ async def recompute_compliance(
     except ValueError as e:
         raise HTTPException(http_status.HTTP_404_NOT_FOUND, str(e))
 
+    hub.publish("compliance", "recomputed", travel_id=travel_id)
     return db.query(ComplianceRecord).filter(
         ComplianceRecord.travel_id == travel_id).first()
 

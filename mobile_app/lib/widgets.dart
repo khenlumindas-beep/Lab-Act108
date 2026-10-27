@@ -132,25 +132,27 @@ class BrandedHeader extends StatelessWidget implements PreferredSizeWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Brand.textPrimary),
-              ),
-              Text(
-                role,
-                style: const TextStyle(
-                    fontSize: 11, color: Brand.textMuted, height: 1.2),
-              ),
-            ],
+          Flexible(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Brand.textPrimary),
+                ),
+                Text(
+                  role,
+                  style: const TextStyle(
+                      fontSize: 11, color: Brand.textMuted, height: 1.2),
+                ),
+              ],
+            ),
           ),
           const SizedBox(width: 8),
           ...actions,

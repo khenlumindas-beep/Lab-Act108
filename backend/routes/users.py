@@ -9,6 +9,7 @@ from models import User
 from schemas import UserResponse, UserProfileResponse, UserCreate, ChangePasswordRequest
 from security import get_current_user, get_current_admin, TokenData, AuthenticationManager
 from audit import log_audit
+from realtime import hub
 import logging
 
 logger = logging.getLogger(__name__)
@@ -75,6 +76,7 @@ async def update_user_profile(
         db.commit()
         db.refresh(user)
         
+        hub.publish("users", "updated", user_id=user.user_id)
         logger.info(f"User profile updated: {user.email}")
         
         return user
@@ -185,6 +187,8 @@ async def create_user(
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
+        hub.publish("users", "created", user_id=new_user.user_id,
+                    role=new_user.role)
         log_audit(db, current_user.user_id, 'user', 'create', new_user.user_id,
                   f"User created: {new_user.email} ({new_user.role})")
         
@@ -235,6 +239,7 @@ async def update_user(
         
         db.commit()
         db.refresh(user)
+        hub.publish("users", "updated", user_id=user_id)
         log_audit(db, current_user.user_id, 'user', 'update', user_id,
                   f"User updated: {user.email} (fields: {', '.join(changed) or 'none'})")
         
@@ -276,6 +281,7 @@ async def deactivate_user(
         
         user.is_active = False
         db.commit()
+        hub.publish("users", "deactivated", user_id=user_id)
         log_audit(db, current_user.user_id, 'user', 'deactivate', user_id,
                   f"User deactivated: {user.email}")
         
@@ -342,6 +348,7 @@ async def change_user_role(
     user.role = new_role
     user.is_active = False  # force re-login (transfer safety)
     db.commit()
+    hub.publish("users", "role_changed", user_id=user_id, role=new_role)
     log_audit(db, current_user.user_id, 'user', 'update', user_id,
               f"Role changed: {user.email} ({old_role} -> {new_role}); "
               f"account blocked pending reactivation")
@@ -379,6 +386,7 @@ async def reactivate_user(
 
     user.is_active = True
     db.commit()
+    hub.publish("users", "reactivated", user_id=user_id)
     log_audit(db, current_user.user_id, 'user', 'reactivate', user_id,
               f"User reactivated: {user.email}")
     logger.info(f"User reactivated: {user.email}")

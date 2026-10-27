@@ -597,6 +597,68 @@ for question, answer in reflections:
     p(question, bold=True)
     p(answer)
 
+# --------------------------------------------------- Appendix A (pgAdmin) --
+h("Appendix A - Verifying the Setup in pgAdmin 4 (screenshot guide)", 1)
+p("Every item below can be checked visually in pgAdmin 4 against the same PostgreSQL "
+  "cluster the backend uses. Writes are only ever performed in the sandbox database "
+  "smarttrack_security_lab; smarttrack_db is only viewed. Full click-by-click version: "
+  "docs/PGADMIN_VERIFICATION_GUIDE.md. Suggested screenshot folder: "
+  "database/security/evidence/pgadmin/.")
+table(
+    ["#", "What to open in pgAdmin", "What the screenshot must show", "Report part"],
+    [
+        ["1", "Servers > SmartTrack (127.0.0.1:5432) > Databases",
+         "smarttrack_db (live) AND smarttrack_security_lab (sandbox) in the same cluster",
+         "Safety note / Part D"],
+        ["2", "Servers > SmartTrack > Login/Group Roles",
+         "smarttrack_app, smarttrack_faculty, smarttrack_super_admin listed",
+         "Part C (roles)"],
+        ["3", "Right-click smarttrack_faculty > Properties > Definition",
+         "Can login? = No; Superuser? = No; Create databases? = No",
+         "Part C (least privilege)"],
+        ["4", "Databases > smarttrack_db > Schemas > system_core > Tables",
+         "users, travels, documents, notifications, audit_logs",
+         "Part B"],
+        ["5", "Right-click users > Properties > Security (or the SQL tab)",
+         "smarttrack_super_admin: SELECT/INSERT/UPDATE only (no DELETE); faculty: no entry",
+         "Part B.1 / Part C"],
+        ["6", "Right-click schema system_core > Properties > Security",
+         "USAGE granted to the three roles; CREATE not granted",
+         "Part C (schema privileges)"],
+        ["7", "smarttrack_db > system_core > travels > Properties > Security",
+         "Row-level security NOT enabled; Policies list empty (live DB untouched)",
+         "Safety note"],
+        ["8", "smarttrack_security_lab > system_core > travels > Properties > Security",
+         "Row-level security ENABLED (sandbox only)",
+         "Part D"],
+        ["9", "travels > Policies",
+         "travels_faculty_own_rows and travels_admin_all, with their USING expressions",
+         "Part D (policy design)"],
+        ["10", "Query Tool on smarttrack_security_lab: SET ROLE smarttrack_faculty; SELECT ...",
+         "Own rows returned; 0 rows when app.current_user_id is empty; "
+         "permission denied on another user's rows",
+         "Part C / Part D (T-07..T-12)"],
+        ["11", "Not in pgAdmin: backend/.env.example, .gitignore lines 2-3, main.py log line",
+         "CHANGE_ME placeholders, .env excluded from Git, password masked as postgres:****@",
+         "Part E"],
+    ])
+p("Query Tool commands used for steps 7, 8 and 10 (read-only for step 7):", bold=True)
+sql("""-- step 7 (live DB, read-only) and step 8 (sandbox)
+SELECT relrowsecurity AS rls_enabled, relforcerowsecurity AS rls_forced
+FROM   pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE  n.nspname = 'system_core' AND c.relname = 'travels';
+-- smarttrack_db            -> rls_enabled = false  (live, untouched)
+-- smarttrack_security_lab  -> rls_enabled = true   (sandbox)
+
+-- step 10 (sandbox only)
+SET LOCAL app.current_user_id = '3';
+SET ROLE smarttrack_faculty;
+SELECT travel_id, user_id FROM system_core.travels;   -- own rows only
+RESET ROLE;""")
+p("Screenshot hygiene: crop the connection dialog and password field, and make sure no "
+  ".env value, token, or password appears in any image submitted with this report.",
+  italic=True)
+
 doc.core_properties.title = "IT108 Activity 7 — PostgreSQL Database Security and Access Control"
 doc.core_properties.subject = SYSTEM_TITLE
 doc.save(OUT)

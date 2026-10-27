@@ -199,7 +199,13 @@ class TravelResponse(TravelBase):
     risk_score: Optional[Decimal] = None
     created_at: datetime
     updated_at: datetime
-    
+
+    # Live submission state (computed from the documents table on read).
+    submission_status: Optional[str] = None
+    submitted_files: Optional[int] = None
+    verified_files: Optional[int] = None
+    last_upload_at: Optional[datetime] = None
+
     class Config:
         from_attributes = True
 

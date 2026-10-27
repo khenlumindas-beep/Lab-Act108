@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 import logging
 from logging.handlers import RotatingFileHandler
 import os
+import asyncio
 from datetime import datetime
 from urllib.parse import urlparse
 
@@ -17,6 +18,7 @@ from routes import auth, users, travels, colleges, documents, analytics, notific
 from routes import post_travel, reentry, compliance
 from routes import ai
 from routes import requirements
+from routes import realtime
 
 # Configure logging
 def setup_logging():
@@ -109,6 +111,14 @@ async def startup_event():
     )
     logger.info("=" * 50)
 
+    # Realtime hub needs the running loop to fan out events from sync handlers.
+    try:
+        from realtime import hub
+        hub.bind_loop(asyncio.get_running_loop())
+        logger.info("Realtime hub bound to event loop")
+    except Exception as e:
+        logger.warning(f"Realtime hub init failed: {e}")
+
     if settings.SECRET_KEY == "your-secret-key-change-in-production":
         logger.warning(
             "SECRET_KEY is the insecure default! Set a strong SECRET_KEY in backend/.env "
@@ -149,6 +159,7 @@ app.include_router(reentry.router)
 app.include_router(compliance.router)
 app.include_router(ai.router)
 app.include_router(requirements.router)
+app.include_router(realtime.router)
 
 # Health check endpoint
 @app.get("/api/health")
